@@ -1,0 +1,89 @@
+<?php
+	require_once('../../inc/config/constants.php');
+	require_once('../../inc/config/db.php');
+	
+	$initialStock = 0;
+	$baseImageFolder = '../../data/book_images/';
+	$bookImageFolder = '';
+	
+	if(isset($_POST['bookDetailsbookNumber'])){
+		
+		$bookId = htmlentities($_POST['bookDetailsbookId']);
+		$bookName = htmlentities($_POST['bookDetailsbookName']);
+		$quantity = htmlentities($_POST['bookDetailsQuantity']);
+		$unitPrice = htmlentities($_POST['bookDetailsUnitPrice']);
+		$status = htmlentities($_POST['bookDetailsStatus']);
+		$description = htmlentities($_POST['bookDetailsDescription']);
+		$bookTopic = htmlentities($_POST['bookTopic']);
+		$bookAuthor = htmlentities($_POST['bookAuthor']);
+		
+		// Check if mandatory fields are not empty
+		if(!empty($bookNumber) && !empty($bookName) && isset($quantity) && isset($unitPrice)){
+			
+			// Sanitize book number
+			$bookNumber = filter_var($bookNumber, FILTER_SANITIZE_STRING);
+			
+			// Validate book quantity. It has to be a number
+			if(filter_var($quantity, FILTER_VALIDATE_INT) === 0 || filter_var($quantity, FILTER_VALIDATE_INT)){
+				// Valid quantity
+			} else {
+				// Quantity is not a valid number
+				echo '<div class="alert alert-danger"><button type="button" class="close" data-dismiss="alert">&times;</button>Please enter a valid number for quantity</div>';
+				exit();
+			}
+			
+			// Validate unit price. It has to be a number or floating point value
+			if(filter_var($unitPrice, FILTER_VALIDATE_FLOAT) === 0.0 || filter_var($unitPrice, FILTER_VALIDATE_FLOAT)){
+				// Valid float (unit price)
+			} else {
+				// Unit price is not a valid number
+				echo '<div class="alert alert-danger"><button type="button" class="close" data-dismiss="alert">&times;</button>Please enter a valid number for unit price</div>';
+				exit();
+			}
+			
+			// Validate discount only if it's provided
+			if(!empty($discount)){
+				if(filter_var($discount, FILTER_VALIDATE_FLOAT) === false){
+					// Discount is not a valid floating point number
+					echo '<div class="alert alert-danger"><button type="button" class="close" data-dismiss="alert">&times;</button>Please enter a valid discount amount</div>';
+					exit();
+				}
+			}
+			
+			// Create image folder for uploading images
+			$bookImageFolder = $baseImageFolder . $bookNumber;
+			if(is_dir($bookImageFolder)){
+				// Folder already exist. Hence, do nothing
+			} else {
+				// Folder does not exist, Hence, create it
+				mkdir($bookImageFolder);
+			}
+			
+			// Calculate the stock values
+			$stockSql = 'SELECT stock FROM book WHERE bookNumber=:bookNumber';
+			$stockStatement = $conn->prepare($stockSql);
+			$stockStatement->execute(['bookNumber' => $bookNumber]);
+			if($stockStatement->rowCount() > 0){
+				//$row = $stockStatement->fetch(PDO::FETCH_ASSOC);
+				//$quantity = $quantity + $row['stock'];
+				echo '<div class="alert alert-danger"><button type="button" class="close" data-dismiss="alert">&times;</button>book already exists in DB. Please click the <strong>Update</strong> button to update the details. Or use a different book Number.</div>';
+				exit();
+			} else {
+				// book does not exist, therefore, you can add it to DB as a new book
+				// Start the insert process
+				$insertbookSql = 'INSERT INTO book(bookNumber, bookName, discount, stock, unitPrice, status, description) VALUES(:bookNumber, :bookName, :discount, :stock, :unitPrice, :status, :description)';
+				$insertbookStatement = $conn->prepare($insertbookSql);
+				$insertbookStatement->execute(['bookNumber' => $bookNumber, 'bookName' => $bookName, 'discount' => $discount, 'stock' => $quantity, 'unitPrice' => $unitPrice, 'status' => $status, 'description' => $description]);
+				echo '<div class="alert alert-success"><button type="button" class="close" data-dismiss="alert">&times;</button>book added to database.</div>';
+				
+				$insertAuthorBook = 'Insert Into book_auth(book_id, author_id) values(:bookId, :bookAuthor)';
+				exit();
+			}
+
+		} else {
+			// One or more mandatory fields are empty. Therefore, display a the error message
+			echo '<div class="alert alert-danger"><button type="button" class="close" data-dismiss="alert">&times;</button>Please enter all fields marked with a (*)</div>';
+			exit();
+		}
+	}
+?>
